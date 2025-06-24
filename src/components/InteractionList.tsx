@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -73,20 +72,34 @@ const InteractionList: React.FC<InteractionListProps> = ({ interactions }) => {
                   </Badge>
                 </div>
                 
-                <div className="flex justify-between items-center text-sm text-gray-500">
-                  <div className="flex items-center space-x-4">
-                    {interaction.status === 'Lost' && interaction.reason && (
-                      <span className="bg-gray-100 px-2 py-1 rounded">
-                        Reason: {interaction.reason}
-                      </span>
-                    )}
-                    {interaction.monetaryValue && (
-                      <span className="bg-green-100 text-green-800 px-2 py-1 rounded font-medium">
-                        {formatCurrency(interaction.monetaryValue)}
-                      </span>
-                    )}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-sm text-gray-500">
+                    <div className="flex items-center space-x-4">
+                      {interaction.status === 'Lost' && interaction.reason && (
+                        <span className="bg-gray-100 px-2 py-1 rounded">
+                          Reason: {interaction.reason}
+                        </span>
+                      )}
+                      {interaction.monetaryValue && (
+                        <span className="bg-green-100 text-green-800 px-2 py-1 rounded font-medium">
+                          {formatCurrency(interaction.monetaryValue)}
+                        </span>
+                      )}
+                    </div>
+                    <span>{formatDate(interaction.createdAt)}</span>
                   </div>
-                  <span>{formatDate(interaction.createdAt)}</span>
+                  
+                  {interaction.relatedProducts && interaction.relatedProducts.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      <span className="text-xs text-gray-500 mr-2">Products:</span>
+                      {interaction.relatedProducts.map((product) => (
+                        <Badge key={product.id} variant="outline" className="text-xs">
+                          {product.description}
+                          {'isCustom' in product && product.isCustom && ' (Custom)'}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             ))

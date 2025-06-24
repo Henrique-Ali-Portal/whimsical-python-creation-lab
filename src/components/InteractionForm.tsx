@@ -6,6 +6,8 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Interaction } from '@/pages/Dashboard';
+import ProductSearch from './ProductSearch';
+import { Product } from './ProductUpload';
 
 interface InteractionFormProps {
   onSubmit: (interaction: Omit<Interaction, 'id' | 'createdAt' | 'salespersonId'>) => void;
@@ -17,8 +19,9 @@ const InteractionForm: React.FC<InteractionFormProps> = ({ onSubmit, onCancel })
     clientName: '',
     description: '',
     status: '' as 'Closed' | 'Quoted' | 'Lost' | '',
-    reason: '' as 'Lack of product' | 'Delay' | 'Price' | '',
-    monetaryValue: ''
+    reason: '' as 'Lack of product' | 'Stock Error' | 'Delay' | 'Price' | 'Other' | '',
+    monetaryValue: '',
+    relatedProducts: [] as (Product | { id: string; description: string; isCustom: true })[]
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -32,10 +35,11 @@ const InteractionForm: React.FC<InteractionFormProps> = ({ onSubmit, onCancel })
       clientName: formData.clientName,
       description: formData.description,
       status: formData.status as 'Closed' | 'Quoted' | 'Lost',
+      relatedProducts: formData.relatedProducts,
     };
 
     if (formData.status === 'Lost' && formData.reason) {
-      interaction.reason = formData.reason as 'Lack of product' | 'Delay' | 'Price';
+      interaction.reason = formData.reason as 'Lack of product' | 'Stock Error' | 'Delay' | 'Price' | 'Other';
     }
 
     if ((formData.status === 'Closed' || formData.status === 'Quoted') && formData.monetaryValue) {
@@ -49,10 +53,14 @@ const InteractionForm: React.FC<InteractionFormProps> = ({ onSubmit, onCancel })
     setFormData({
       ...formData,
       status: value as 'Closed' | 'Quoted' | 'Lost',
-      reason: '', // Reset reason when status changes
-      monetaryValue: '' // Reset monetary value when status changes
+      reason: '',
+      monetaryValue: '',
+      relatedProducts: []
     });
   };
+
+  const showProductSelection = formData.status === 'Lost' && 
+    ['Lack of product', 'Stock Error', 'Delay', 'Price'].includes(formData.reason);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -105,11 +113,21 @@ const InteractionForm: React.FC<InteractionFormProps> = ({ onSubmit, onCancel })
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="Lack of product">Lack of product</SelectItem>
+              <SelectItem value="Stock Error">Stock Error</SelectItem>
               <SelectItem value="Delay">Delay</SelectItem>
               <SelectItem value="Price">Price</SelectItem>
+              <SelectItem value="Other">Other</SelectItem>
             </SelectContent>
           </Select>
         </div>
+      )}
+
+      {showProductSelection && (
+        <ProductSearch
+          selectedProducts={formData.relatedProducts}
+          onProductsChange={(products) => setFormData({ ...formData, relatedProducts: products })}
+          label="Related Products"
+        />
       )}
 
       {(formData.status === 'Closed' || formData.status === 'Quoted') && (
