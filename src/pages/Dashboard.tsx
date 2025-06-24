@@ -40,18 +40,26 @@ const Dashboard = () => {
       return;
     }
     
-    // Enhanced user with role system
-    const basicUser = JSON.parse(storedUser);
-    const enhancedUser: UserProfile = {
-      ...basicUser,
-      role: 'SALESPERSON' as UserRole, // Default role, can be updated through user management
-      fullName: basicUser.username,
-      email: '',
-      registeredAt: new Date().toISOString()
-    };
-    
-    setUser(enhancedUser);
-    loadInteractions();
+    try {
+      const parsedUser = JSON.parse(storedUser);
+      
+      // Ensure the user object has all required properties
+      const enhancedUser: UserProfile = {
+        id: parsedUser.id || Date.now(),
+        username: parsedUser.username || 'Unknown',
+        fullName: parsedUser.fullName || parsedUser.username || 'Unknown User',
+        email: parsedUser.email || '',
+        role: parsedUser.role || 'SALESPERSON',
+        storeId: parsedUser.storeId,
+        registeredAt: parsedUser.registeredAt || new Date().toISOString()
+      };
+      
+      setUser(enhancedUser);
+      loadInteractions();
+    } catch (error) {
+      console.error('Error parsing user data:', error);
+      navigate('/login');
+    }
   }, [navigate]);
 
   const loadInteractions = () => {
@@ -108,7 +116,7 @@ const Dashboard = () => {
           <div className="flex justify-between items-center py-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Sales CRM</h1>
-              <p className="text-gray-600">Welcome back, {user.username}! ({user.role})</p>
+              <p className="text-gray-600">Welcome back, {user.fullName}! ({user.role})</p>
             </div>
             <div className="flex items-center space-x-4">
               <Button

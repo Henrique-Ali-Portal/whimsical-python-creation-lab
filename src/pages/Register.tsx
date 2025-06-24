@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from 'react-router-dom';
+import { UserProfile, UserRole } from '@/components/UserManagement';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -50,26 +51,54 @@ const Register = () => {
       return;
     }
 
-    // Simulate user registration
-    const existingUsers = JSON.parse(localStorage.getItem('crmUsers') || '[]');
-    const newUser = {
-      id: Date.now(),
-      username: formData.username,
-      fullName: formData.fullName,
-      email: formData.email,
-      registeredAt: new Date().toISOString()
-    };
+    try {
+      const existingUsers = JSON.parse(localStorage.getItem('crmUsers') || '[]');
+      const existingPasswords = JSON.parse(localStorage.getItem('crmPasswords') || '{}');
 
-    existingUsers.push(newUser);
-    localStorage.setItem('crmUsers', JSON.stringify(existingUsers));
+      // Check if username already exists
+      if (existingUsers.some((user: UserProfile) => user.username === formData.username)) {
+        toast({
+          title: "Registration Failed",
+          description: "Username already exists.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
 
-    toast({
-      title: "Registration Successful",
-      description: "Your account has been created successfully!",
-    });
+      // Determine role - first user becomes admin, others become salesperson
+      const role: UserRole = existingUsers.length === 0 ? 'ADMIN' : 'SALESPERSON';
 
-    navigate('/login');
-    setIsLoading(false);
+      const newUser: UserProfile = {
+        id: Date.now(),
+        username: formData.username,
+        fullName: formData.fullName,
+        email: formData.email,
+        role: role,
+        registeredAt: new Date().toISOString()
+      };
+
+      existingUsers.push(newUser);
+      existingPasswords[formData.username] = formData.password;
+
+      localStorage.setItem('crmUsers', JSON.stringify(existingUsers));
+      localStorage.setItem('crmPasswords', JSON.stringify(existingPasswords));
+
+      toast({
+        title: "Registration Successful",
+        description: `Your account has been created successfully! Role: ${role}`,
+      });
+
+      navigate('/login');
+    } catch (error) {
+      toast({
+        title: "Registration Error",
+        description: "An error occurred during registration.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

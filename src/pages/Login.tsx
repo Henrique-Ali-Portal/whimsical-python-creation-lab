@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from 'react-router-dom';
+import { UserProfile } from '@/components/UserManagement';
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -14,26 +15,76 @@ const Login = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  const createDefaultAdmin = () => {
+    const defaultAdmin: UserProfile = {
+      id: 1,
+      username: 'admin',
+      fullName: 'System Administrator',
+      email: 'admin@crm.com',
+      role: 'ADMIN',
+      registeredAt: new Date().toISOString()
+    };
+    
+    const users = [defaultAdmin];
+    localStorage.setItem('crmUsers', JSON.stringify(users));
+    
+    // Also create admin password mapping
+    const passwords = { 'admin': 'admin123' };
+    localStorage.setItem('crmPasswords', JSON.stringify(passwords));
+    
+    return defaultAdmin;
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate authentication
-    if (username && password) {
-      localStorage.setItem('crmUser', JSON.stringify({ username, id: Date.now() }));
+    try {
+      // Get stored users and passwords
+      const storedUsers = JSON.parse(localStorage.getItem('crmUsers') || '[]');
+      const storedPasswords = JSON.parse(localStorage.getItem('crmPasswords') || '{}');
+
+      // If no users exist, create default admin
+      if (storedUsers.length === 0) {
+        const defaultAdmin = createDefaultAdmin();
+        if (username === 'admin' && password === 'admin123') {
+          localStorage.setItem('crmUser', JSON.stringify(defaultAdmin));
+          toast({
+            title: "Login Successful",
+            description: "Welcome to the CRM system! (Default admin account)",
+          });
+          navigate('/dashboard');
+          return;
+        }
+      }
+
+      // Find user by username
+      const user = storedUsers.find((u: UserProfile) => u.username === username);
+      const userPassword = storedPasswords[username];
+
+      if (user && userPassword === password) {
+        localStorage.setItem('crmUser', JSON.stringify(user));
+        toast({
+          title: "Login Successful",
+          description: `Welcome back, ${user.fullName}!`,
+        });
+        navigate('/dashboard');
+      } else {
+        toast({
+          title: "Login Failed",
+          description: "Invalid username or password.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
       toast({
-        title: "Login Successful",
-        description: "Welcome to the CRM system!",
-      });
-      navigate('/dashboard');
-    } else {
-      toast({
-        title: "Login Failed",
-        description: "Please enter valid credentials.",
+        title: "Login Error",
+        description: "An error occurred during login.",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   const handleRegister = () => {
@@ -80,6 +131,14 @@ const Login = () => {
               Create New Account
             </Button>
           </form>
+          
+          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <strong>Default Admin Account:</strong><br />
+              Username: admin<br />
+              Password: admin123
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>
