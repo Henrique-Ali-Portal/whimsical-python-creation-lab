@@ -33,32 +33,66 @@ export const hasHigherOrEqualRole = (userRole: UserRole, targetRole: UserRole): 
 // Initialize default admin user if none exists
 export const initializeDefaultAdmin = async () => {
   try {
+    console.log('Checking for existing admin users...');
+    
     // Check if any admin users exist
     const { data: adminUsers, error } = await supabase
       .from('profiles')
-      .select('id')
+      .select('id, username')
       .eq('role', 'ADMIN')
       .limit(1);
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error checking admin users:', error);
+      throw error;
+    }
+
+    console.log('Admin users found:', adminUsers);
 
     if (!adminUsers || adminUsers.length === 0) {
+      console.log('No admin users found. Creating default admin...');
+      
       // Create default admin user without email confirmation
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: 'admin@crm.com',
-        password: 'admin123',
+        password: 'Admin@123',
         options: {
           data: {
-            username: 'admin',
-            full_name: 'System Administrator',
+            username: 'Admin',
+            full_name: 'Admin',
+            role: 'ADMIN',
           },
           emailRedirectTo: undefined, // Disable email confirmation
         },
       });
 
-      if (signUpError) throw signUpError;
+      if (signUpError) {
+        console.error('Error creating default admin:', signUpError);
+        
+        // If it's a rate limit error, check if the user might already exist
+        if (signUpError.message.includes('rate limit') || signUpError.message.includes('36 seconds')) {
+          console.log('Rate limit hit, checking if admin already exists in auth...');
+          
+          // Try to sign in with the default credentials to see if the user exists
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email: 'admin@crm.com',
+            password: 'Admin@123',
+          });
+          
+          if (signInData?.user && !signInError) {
+            console.log('Default admin already exists and can sign in');
+            await supabase.auth.signOut(); // Sign out after test
+            return signInData.user;
+          }
+        }
+        
+        throw signUpError;
+      }
       
-      return data.user;
+      console.log('Default admin created successfully:', data);
+      return data?.user;
+    } else {
+      console.log('Admin user already exists:', adminUsers[0]);
     }
     
     return null;
@@ -77,6 +111,8 @@ export const createUser = async (userData: {
   role: UserRole;
   store_id?: string;
 }) => {
+  console.log('Creating new user:', { username: userData.username, role: userData.role });
+  
   const { data, error } = await supabase.auth.signUp({
     email: userData.email,
     password: userData.password,
@@ -90,6 +126,12 @@ export const createUser = async (userData: {
       emailRedirectTo: undefined, // Disable email confirmation
     },
   });
+
+  if (error) {
+    console.error('Error creating user:', error);
+  } else {
+    console.log('User created successfully:', data?.user?.id);
+  }
 
   return { data, error };
 };

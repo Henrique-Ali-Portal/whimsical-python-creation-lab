@@ -21,6 +21,7 @@ export const useAuth = () => {
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session:', session?.user?.id);
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchProfile(session.user.id);
@@ -32,6 +33,7 @@ export const useAuth = () => {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state change:', event, session?.user?.id);
         setUser(session?.user ?? null);
         if (session?.user) {
           await fetchProfile(session.user.id);
@@ -47,13 +49,20 @@ export const useAuth = () => {
 
   const fetchProfile = async (userId: string) => {
     try {
+      console.log('Fetching profile for user:', userId);
+      
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching profile:', error);
+        throw error;
+      }
+      
+      console.log('Profile fetched:', data);
       
       // Type cast the role to ensure it matches our UserProfile interface
       const profileData: UserProfile = {
@@ -71,6 +80,8 @@ export const useAuth = () => {
 
   const signIn = async (username: string, password: string) => {
     try {
+      console.log('Attempting to sign in with username:', username);
+      
       // First, find the user by username to get their email
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
@@ -79,8 +90,11 @@ export const useAuth = () => {
         .single();
 
       if (profileError || !profileData) {
+        console.error('Profile not found for username:', username, profileError);
         throw new Error('Invalid username or password');
       }
+
+      console.log('Found email for username:', profileData.email);
 
       // Use the email to sign in
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -89,16 +103,21 @@ export const useAuth = () => {
       });
 
       if (error) {
+        console.error('Sign in error:', error);
         throw error;
       }
 
+      console.log('Sign in successful:', data.user?.id);
       return { data, error: null };
     } catch (error: any) {
+      console.error('Sign in failed:', error);
       return { data: null, error };
     }
   };
 
   const signUp = async (email: string, password: string, metadata: { username: string; full_name: string }) => {
+    console.log('Signing up user:', metadata.username);
+    
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -107,11 +126,22 @@ export const useAuth = () => {
         emailRedirectTo: undefined, // Disable email confirmation
       },
     });
+    
+    if (error) {
+      console.error('Sign up error:', error);
+    } else {
+      console.log('Sign up successful:', data.user?.id);
+    }
+    
     return { data, error };
   };
 
   const signOut = async () => {
+    console.log('Signing out user');
     const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error('Sign out error:', error);
+    }
     return { error };
   };
 
