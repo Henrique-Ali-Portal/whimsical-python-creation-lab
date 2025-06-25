@@ -72,7 +72,14 @@ const SupabaseUserManagement: React.FC = () => {
         .order('created_at');
 
       if (error) throw error;
-      setUsers(data || []);
+      
+      // Type cast the data to ensure role matches our UserProfile interface
+      const typedUsers: UserProfile[] = (data || []).map(user => ({
+        ...user,
+        role: user.role as UserRole
+      }));
+      
+      setUsers(typedUsers);
     } catch (error) {
       console.error('Error loading users:', error);
     } finally {

@@ -54,7 +54,14 @@ export const useAuth = () => {
         .single();
 
       if (error) throw error;
-      setProfile(data);
+      
+      // Type cast the role to ensure it matches our UserProfile interface
+      const profileData: UserProfile = {
+        ...data,
+        role: data.role as 'ADMIN' | 'BOARD' | 'MANAGER' | 'SALESPERSON'
+      };
+      
+      setProfile(profileData);
     } catch (error) {
       console.error('Error fetching profile:', error);
     } finally {

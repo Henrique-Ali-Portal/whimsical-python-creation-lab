@@ -9,6 +9,8 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
+import SupabaseLogin from "./pages/SupabaseLogin";
+import SupabaseDashboard from "./pages/SupabaseDashboard";
 
 const queryClient = new QueryClient();
 

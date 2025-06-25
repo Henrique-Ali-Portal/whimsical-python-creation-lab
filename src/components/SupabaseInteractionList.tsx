@@ -53,7 +53,14 @@ const SupabaseInteractionList: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setInteractions(data || []);
+      
+      // Type cast the data to ensure status matches our interface
+      const typedInteractions: Interaction[] = (data || []).map(item => ({
+        ...item,
+        status: item.status as 'Closed' | 'Quoted' | 'Lost'
+      }));
+      
+      setInteractions(typedInteractions);
     } catch (error) {
       console.error('Error loading interactions:', error);
     } finally {
