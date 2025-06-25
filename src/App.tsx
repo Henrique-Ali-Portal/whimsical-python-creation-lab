@@ -23,6 +23,8 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/supabase-login" element={<SupabaseLogin />} />
+          <Route path="/supabase-dashboard" element={<SupabaseDashboard />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

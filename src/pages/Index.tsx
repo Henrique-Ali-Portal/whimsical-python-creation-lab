@@ -72,15 +72,15 @@ const Index = () => {
 
         <div className="text-center space-y-4">
           <div className="space-x-4">
-            <Button size="lg" onClick={() => navigate('/login')}>
-              Login to CRM
+            <Button size="lg" onClick={() => navigate('/supabase-login')}>
+              Login to CRM (Supabase)
             </Button>
-            <Button size="lg" variant="outline" onClick={() => navigate('/register')}>
-              Create Account
+            <Button size="lg" variant="outline" onClick={() => navigate('/login')}>
+              Login (LocalStorage)
             </Button>
           </div>
           <p className="text-sm text-gray-500">
-            New to our system? Create an account to get started with your sales tracking.
+            Choose between Supabase-powered backend or local storage demo.
           </p>
         </div>
       </div>
