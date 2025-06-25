@@ -10,6 +10,7 @@ import DashboardStats from '@/components/DashboardStats';
 import ProductUpload, { Product } from '@/components/ProductUpload';
 import UserManagement, { UserProfile, UserRole } from '@/components/UserManagement';
 import { LogOut, Plus, Upload, Settings } from 'lucide-react';
+import { canManageUsers, canUploadProducts } from '@/utils/security';
 
 export interface Interaction {
   id: number;
@@ -43,7 +44,7 @@ const Dashboard = () => {
     try {
       const parsedUser = JSON.parse(storedUser);
       
-      // Ensure the user object has all required properties
+      // Ensure the user object has all required properties with proper role validation
       const enhancedUser: UserProfile = {
         id: parsedUser.id || Date.now(),
         username: parsedUser.username || 'Unknown',
@@ -100,14 +101,15 @@ const Dashboard = () => {
   const handleProductsUploaded = (products: Product[]) => {
     toast({
       title: "Products Updated",
-      description: `${products.length} products are now available for selection.`,
+      description: `${products.length} products are now available globally for all users.`,
     });
     setShowProductUpload(false);
   };
 
   if (!user) return null;
 
-  const canManageUsers = user.role === 'ADMIN' || user.role === 'BOARD';
+  const canManage = canManageUsers(user.role);
+  const canUpload = canUploadProducts(user.role);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -125,14 +127,16 @@ const Dashboard = () => {
               >
                 Interactions
               </Button>
-              <Button
-                variant={activeTab === 'products' ? 'default' : 'outline'}
-                onClick={() => setActiveTab('products')}
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Products
-              </Button>
-              {canManageUsers && (
+              {canUpload && (
+                <Button
+                  variant={activeTab === 'products' ? 'default' : 'outline'}
+                  onClick={() => setActiveTab('products')}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Products
+                </Button>
+              )}
+              {canManage && (
                 <Button
                   variant={activeTab === 'users' ? 'default' : 'outline'}
                   onClick={() => setActiveTab('users')}
@@ -187,11 +191,11 @@ const Dashboard = () => {
           </>
         )}
 
-        {activeTab === 'products' && (
-          <ProductUpload onProductsUploaded={handleProductsUploaded} />
+        {activeTab === 'products' && canUpload && (
+          <ProductUpload onProductsUploaded={handleProductsUploaded} currentUser={user} />
         )}
 
-        {activeTab === 'users' && canManageUsers && (
+        {activeTab === 'users' && canManage && (
           <UserManagement currentUser={user} />
         )}
       </main>

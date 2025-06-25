@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from 'react-router-dom';
 import { UserProfile } from '@/components/UserManagement';
+import { initializeDefaultAdmin, verifyPassword } from '@/utils/security';
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -15,54 +16,23 @@ const Login = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const createDefaultAdmin = () => {
-    const defaultAdmin: UserProfile = {
-      id: 1,
-      username: 'admin',
-      fullName: 'System Administrator',
-      email: 'admin@crm.com',
-      role: 'ADMIN',
-      registeredAt: new Date().toISOString()
-    };
-    
-    const users = [defaultAdmin];
-    localStorage.setItem('crmUsers', JSON.stringify(users));
-    
-    // Also create admin password mapping
-    const passwords = { 'admin': 'admin123' };
-    localStorage.setItem('crmPasswords', JSON.stringify(passwords));
-    
-    return defaultAdmin;
-  };
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
+      // Initialize default admin if no users exist
+      initializeDefaultAdmin();
+      
       // Get stored users and passwords
       const storedUsers = JSON.parse(localStorage.getItem('crmUsers') || '[]');
       const storedPasswords = JSON.parse(localStorage.getItem('crmPasswords') || '{}');
 
-      // If no users exist, create default admin
-      if (storedUsers.length === 0) {
-        const defaultAdmin = createDefaultAdmin();
-        if (username === 'admin' && password === 'admin123') {
-          localStorage.setItem('crmUser', JSON.stringify(defaultAdmin));
-          toast({
-            title: "Login Successful",
-            description: "Welcome to the CRM system! (Default admin account)",
-          });
-          navigate('/dashboard');
-          return;
-        }
-      }
-
       // Find user by username
       const user = storedUsers.find((u: UserProfile) => u.username === username);
-      const userPassword = storedPasswords[username];
+      const hashedPassword = storedPasswords[username];
 
-      if (user && userPassword === password) {
+      if (user && hashedPassword && verifyPassword(password, hashedPassword)) {
         localStorage.setItem('crmUser', JSON.stringify(user));
         toast({
           title: "Login Successful",
@@ -85,10 +55,6 @@ const Login = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleRegister = () => {
-    navigate('/register');
   };
 
   return (
@@ -126,9 +92,6 @@ const Login = () => {
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? 'Logging in...' : 'Login'}
-            </Button>
-            <Button type="button" variant="outline" className="w-full" onClick={handleRegister}>
-              Create New Account
             </Button>
           </form>
           

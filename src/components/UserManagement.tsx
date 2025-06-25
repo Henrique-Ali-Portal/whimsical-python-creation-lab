@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { User, Settings } from 'lucide-react';
+import { User, Settings, Key } from 'lucide-react';
+import { canManageUsers, canChangePassword, hashPassword } from '@/utils/security';
 
 export type UserRole = 'ADMIN' | 'BOARD' | 'MANAGER' | 'SALESPERSON';
 
@@ -38,12 +38,18 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) => {
     username: '',
     fullName: '',
     email: '',
+    password: '',
     role: 'SALESPERSON' as UserRole,
     storeId: ''
   });
+  const [passwordChange, setPasswordChange] = useState({
+    userId: 0,
+    newPassword: '',
+    showDialog: false
+  });
   const { toast } = useToast();
 
-  const canManageUsers = currentUser.role === 'ADMIN' || currentUser.role === 'BOARD';
+  const canManage = canManageUsers(currentUser.role);
 
   useEffect(() => {
     loadUsers();
@@ -61,7 +67,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) => {
   };
 
   const addStore = () => {
-    if (!newStore.name || !canManageUsers) return;
+    if (!newStore.name || !canManage) return;
 
     const store: Store = {
       id: `store-${Date.now()}`,
@@ -81,7 +87,18 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) => {
   };
 
   const addUser = () => {
-    if (!newUser.username || !newUser.fullName || !canManageUsers) return;
+    if (!newUser.username || !newUser.fullName || !newUser.password || !canManage) return;
+
+    // Check if username already exists
+    const existingUsers = JSON.parse(localStorage.getItem('crmUsers') || '[]');
+    if (existingUsers.some((user: UserProfile) => user.username === newUser.username)) {
+      toast({
+        title: "User Creation Failed",
+        description: "Username already exists.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     const user: UserProfile = {
       id: Date.now(),
@@ -96,10 +113,17 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) => {
     const updatedUsers = [...users, user];
     setUsers(updatedUsers);
     localStorage.setItem('crmUsers', JSON.stringify(updatedUsers));
+
+    // Store hashed password
+    const existingPasswords = JSON.parse(localStorage.getItem('crmPasswords') || '{}');
+    existingPasswords[newUser.username] = hashPassword(newUser.password);
+    localStorage.setItem('crmPasswords', JSON.stringify(existingPasswords));
+
     setNewUser({
       username: '',
       fullName: '',
       email: '',
+      password: '',
       role: 'SALESPERSON',
       storeId: ''
     });
@@ -110,8 +134,33 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) => {
     });
   };
 
+  const changeUserPassword = () => {
+    const targetUser = users.find(u => u.id === passwordChange.userId);
+    if (!targetUser || !passwordChange.newPassword) return;
+
+    if (!canChangePassword(currentUser.role, targetUser.role)) {
+      toast({
+        title: "Access Denied",
+        description: "You don't have permission to change this user's password.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const existingPasswords = JSON.parse(localStorage.getItem('crmPasswords') || '{}');
+    existingPasswords[targetUser.username] = hashPassword(passwordChange.newPassword);
+    localStorage.setItem('crmPasswords', JSON.stringify(existingPasswords));
+
+    setPasswordChange({ userId: 0, newPassword: '', showDialog: false });
+
+    toast({
+      title: "Password Changed",
+      description: `Password for ${targetUser.fullName} has been updated.`,
+    });
+  };
+
   const updateUserStore = (userId: number, storeId: string) => {
-    if (!canManageUsers) return;
+    if (!canManage) return;
 
     const updatedUsers = users.map(user =>
       user.id === userId ? { ...user, storeId } : user
@@ -125,7 +174,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) => {
     });
   };
 
-  if (!canManageUsers) {
+  if (!canManage) {
     return (
       <Card>
         <CardHeader>
@@ -215,6 +264,16 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) => {
               />
             </div>
             <div>
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={newUser.password}
+                onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                placeholder="Set password"
+              />
+            </div>
+            <div>
               <Label>Role</Label>
               <Select value={newUser.role} onValueChange={(role) => setNewUser({ ...newUser, role: role as UserRole })}>
                 <SelectTrigger>
@@ -228,7 +287,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="col-span-2">
+            <div>
               <Label>Assign to Store</Label>
               <Select value={newUser.storeId} onValueChange={(storeId) => setNewUser({ ...newUser, storeId })}>
                 <SelectTrigger>
@@ -262,26 +321,63 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) => {
                     {user.username} • {user.role} • {stores.find(s => s.id === user.storeId)?.name || 'No store assigned'}
                   </div>
                 </div>
-                <Select
-                  value={user.storeId || ''}
-                  onValueChange={(storeId) => updateUserStore(user.id, storeId)}
-                >
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Assign store" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {stores.map((store) => (
-                      <SelectItem key={store.id} value={store.id}>
-                        {store.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-2">
+                  {canChangePassword(currentUser.role, user.role) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setPasswordChange({ userId: user.id, newPassword: '', showDialog: true })}
+                    >
+                      <Key className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Select
+                    value={user.storeId || ''}
+                    onValueChange={(storeId) => updateUserStore(user.id, storeId)}
+                  >
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Assign store" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {stores.map((store) => (
+                        <SelectItem key={store.id} value={store.id}>
+                          {store.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             ))}
           </div>
         </CardContent>
       </Card>
+
+      {passwordChange.showDialog && (
+        <Card className="border-2 border-orange-200">
+          <CardHeader>
+            <CardTitle>Change Password</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="newPassword">New Password</Label>
+              <Input
+                id="newPassword"
+                type="password"
+                value={passwordChange.newPassword}
+                onChange={(e) => setPasswordChange({ ...passwordChange, newPassword: e.target.value })}
+                placeholder="Enter new password"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={changeUserPassword}>Change Password</Button>
+              <Button variant="outline" onClick={() => setPasswordChange({ userId: 0, newPassword: '', showDialog: false })}>
+                Cancel
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
