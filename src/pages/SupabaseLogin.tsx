@@ -10,7 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { initializeDefaultAdmin } from '@/utils/supabase-security';
 
 const SupabaseLogin = () => {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -23,7 +23,7 @@ const SupabaseLogin = () => {
     
     // Redirect if already logged in
     if (user && profile) {
-      navigate('/dashboard');
+      navigate('/supabase-dashboard');
     }
   }, [user, profile, navigate]);
 
@@ -32,7 +32,7 @@ const SupabaseLogin = () => {
     setIsLoading(true);
 
     try {
-      const { data, error } = await signIn(email, password);
+      const { data, error } = await signIn(username, password);
 
       if (error) {
         toast({
@@ -48,7 +48,7 @@ const SupabaseLogin = () => {
           title: "Login Successful",
           description: "Welcome back!",
         });
-        navigate('/dashboard');
+        navigate('/supabase-dashboard');
       }
     } catch (error) {
       toast({
@@ -73,13 +73,13 @@ const SupabaseLogin = () => {
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="username">Username</Label>
               <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
+                id="username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter your username"
                 required
               />
             </div>
@@ -102,7 +102,7 @@ const SupabaseLogin = () => {
           <div className="mt-4 p-3 bg-blue-50 rounded-lg">
             <p className="text-sm text-blue-800">
               <strong>Default Admin Account:</strong><br />
-              Email: admin@crm.com<br />
+              Username: admin<br />
               Password: admin123
             </p>
           </div>

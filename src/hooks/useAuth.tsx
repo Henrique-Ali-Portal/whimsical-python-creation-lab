@@ -69,12 +69,33 @@ export const useAuth = () => {
     }
   };
 
-  const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { data, error };
+  const signIn = async (username: string, password: string) => {
+    try {
+      // First, find the user by username to get their email
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('username', username)
+        .single();
+
+      if (profileError || !profileData) {
+        throw new Error('Invalid username or password');
+      }
+
+      // Use the email to sign in
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: profileData.email,
+        password,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      return { data, error: null };
+    } catch (error: any) {
+      return { data: null, error };
+    }
   };
 
   const signUp = async (email: string, password: string, metadata: { username: string; full_name: string }) => {
@@ -83,6 +104,7 @@ export const useAuth = () => {
       password,
       options: {
         data: metadata,
+        emailRedirectTo: undefined, // Disable email confirmation
       },
     });
     return { data, error };

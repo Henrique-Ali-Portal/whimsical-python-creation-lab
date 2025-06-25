@@ -43,7 +43,7 @@ export const initializeDefaultAdmin = async () => {
     if (error) throw error;
 
     if (!adminUsers || adminUsers.length === 0) {
-      // Create default admin user
+      // Create default admin user without email confirmation
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: 'admin@crm.com',
         password: 'admin123',
@@ -52,6 +52,7 @@ export const initializeDefaultAdmin = async () => {
             username: 'admin',
             full_name: 'System Administrator',
           },
+          emailRedirectTo: undefined, // Disable email confirmation
         },
       });
 
@@ -86,6 +87,7 @@ export const createUser = async (userData: {
         role: userData.role,
         store_id: userData.store_id,
       },
+      emailRedirectTo: undefined, // Disable email confirmation
     },
   });
 
