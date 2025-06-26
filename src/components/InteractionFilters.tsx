@@ -53,7 +53,8 @@ const InteractionFilters: React.FC<InteractionFiltersProps> = ({ onFiltersChange
 
     try {
       const { data, error } = await supabase
-        .rpc('get_user_accessible_stores', { user_id: profile.id });
+        .from('stores')
+        .select('id, name');
 
       if (error) throw error;
       
@@ -68,7 +69,9 @@ const InteractionFilters: React.FC<InteractionFiltersProps> = ({ onFiltersChange
 
     try {
       const { data, error } = await supabase
-        .rpc('get_accessible_users', { requesting_user_id: profile.id });
+        .from('profiles')
+        .select('id, full_name, username')
+        .eq('role', 'SALESPERSON');
 
       if (error) throw error;
       
