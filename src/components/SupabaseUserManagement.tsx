@@ -6,10 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { User, Settings, Key } from 'lucide-react';
+import { User, Settings } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { canManageUsers, canChangePassword, UserRole } from '@/utils/supabase-security';
+import { canManageUsers, UserRole } from '@/utils/supabase-security';
 
 interface Store {
   id: string;
@@ -26,7 +26,7 @@ interface UserProfile {
   created_at: string;
   user_stores: {
     stores: Store;
-  }[];
+  }[] | null;
 }
 
 const SupabaseUserManagement: React.FC = () => {
@@ -41,12 +41,8 @@ const SupabaseUserManagement: React.FC = () => {
     role: 'SALESPERSON' as UserRole,
     store_id: ''
   });
-  const [passwordChange, setPasswordChange] = useState({
-    userId: '',
-    newPassword: '',
-    showDialog: false
-  });
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
   const { profile } = useAuth();
 
@@ -54,10 +50,22 @@ const SupabaseUserManagement: React.FC = () => {
 
   useEffect(() => {
     if (canManage) {
-      loadUsers();
-      loadStores();
+      loadData();
+    } else {
+      setLoading(false);
     }
   }, [canManage]);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      await Promise.all([loadUsers(), loadStores()]);
+    } catch (error) {
+      console.error('Error loading management data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadUsers = async () => {
     try {
@@ -71,19 +79,22 @@ const SupabaseUserManagement: React.FC = () => {
         `)
         .order('created_at');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading users:', error);
+        return;
+      }
       
-      // Type cast the data to ensure role matches our UserProfile interface
+      // Type cast and ensure proper structure
       const typedUsers: UserProfile[] = (data || []).map(user => ({
         ...user,
-        role: user.role as UserRole
+        role: user.role as UserRole,
+        user_stores: user.user_stores || []
       }));
       
       setUsers(typedUsers);
     } catch (error) {
       console.error('Error loading users:', error);
-    } finally {
-      setLoading(false);
+      setUsers([]);
     }
   };
 
@@ -94,28 +105,42 @@ const SupabaseUserManagement: React.FC = () => {
         .select('*')
         .order('name');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading stores:', error);
+        return;
+      }
+      
       setStores(data || []);
     } catch (error) {
       console.error('Error loading stores:', error);
+      setStores([]);
     }
   };
 
   const addStore = async () => {
-    if (!newStore.name || !canManage) return;
+    if (!newStore.name.trim() || !canManage || submitting) return;
 
+    setSubmitting(true);
     try {
       const { error } = await supabase
         .from('stores')
         .insert({
-          name: newStore.name,
-          address: newStore.address
+          name: newStore.name.trim(),
+          address: newStore.address.trim() || null
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error adding store:', error);
+        toast({
+          title: "Error",
+          description: "Failed to add store. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
 
       setNewStore({ name: '', address: '' });
-      loadStores();
+      await loadStores();
 
       toast({
         title: "Store Added",
@@ -128,26 +153,38 @@ const SupabaseUserManagement: React.FC = () => {
         description: "Failed to add store.",
         variant: "destructive",
       });
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const addUser = async () => {
-    if (!newUser.username || !newUser.full_name || !newUser.password || !canManage) return;
+    if (!newUser.username.trim() || !newUser.full_name.trim() || !newUser.email.trim() || !newUser.password.trim() || !canManage || submitting) return;
 
+    setSubmitting(true);
     try {
       const { data, error } = await supabase.auth.signUp({
-        email: newUser.email,
+        email: newUser.email.trim(),
         password: newUser.password,
         options: {
           data: {
-            username: newUser.username,
-            full_name: newUser.full_name,
+            username: newUser.username.trim(),
+            full_name: newUser.full_name.trim(),
             role: newUser.role,
           },
+          emailRedirectTo: undefined, // Disable email confirmation
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error adding user:', error);
+        toast({
+          title: "Error",
+          description: error.message || "Failed to add user.",
+          variant: "destructive",
+        });
+        return;
+      }
 
       // Assign to store if selected
       if (newUser.store_id && data.user) {
@@ -158,7 +195,9 @@ const SupabaseUserManagement: React.FC = () => {
             store_id: newUser.store_id
           });
 
-        if (storeError) console.error('Error assigning store:', storeError);
+        if (storeError) {
+          console.error('Error assigning store:', storeError);
+        }
       }
 
       setNewUser({
@@ -170,7 +209,7 @@ const SupabaseUserManagement: React.FC = () => {
         store_id: ''
       });
 
-      loadUsers();
+      await loadUsers();
 
       toast({
         title: "User Added",
@@ -183,12 +222,15 @@ const SupabaseUserManagement: React.FC = () => {
         description: error.message || "Failed to add user.",
         variant: "destructive",
       });
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const updateUserStore = async (userId: string, storeId: string) => {
-    if (!canManage) return;
+    if (!canManage || submitting) return;
 
+    setSubmitting(true);
     try {
       // Remove existing store assignments
       await supabase
@@ -205,10 +247,18 @@ const SupabaseUserManagement: React.FC = () => {
             store_id: storeId
           });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error updating user store:', error);
+          toast({
+            title: "Error",
+            description: "Failed to update user store assignment.",
+            variant: "destructive",
+          });
+          return;
+        }
       }
 
-      loadUsers();
+      await loadUsers();
 
       toast({
         title: "User Updated",
@@ -221,6 +271,8 @@ const SupabaseUserManagement: React.FC = () => {
         description: "Failed to update user store assignment.",
         variant: "destructive",
       });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -244,12 +296,13 @@ const SupabaseUserManagement: React.FC = () => {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Loading...</CardTitle>
+          <CardTitle>Loading Management Panel...</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="animate-pulse space-y-4">
             <div className="h-4 bg-gray-200 rounded w-3/4"></div>
             <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+            <div className="h-4 bg-gray-200 rounded w-2/3"></div>
           </div>
         </CardContent>
       </Card>
@@ -275,6 +328,7 @@ const SupabaseUserManagement: React.FC = () => {
                 value={newStore.name}
                 onChange={(e) => setNewStore({ ...newStore, name: e.target.value })}
                 placeholder="Enter store name"
+                disabled={submitting}
               />
             </div>
             <div>
@@ -284,10 +338,13 @@ const SupabaseUserManagement: React.FC = () => {
                 value={newStore.address}
                 onChange={(e) => setNewStore({ ...newStore, address: e.target.value })}
                 placeholder="Enter store address"
+                disabled={submitting}
               />
             </div>
           </div>
-          <Button onClick={addStore}>Add Store</Button>
+          <Button onClick={addStore} disabled={submitting || !newStore.name.trim()}>
+            {submitting ? 'Adding...' : 'Add Store'}
+          </Button>
         </CardContent>
       </Card>
 
@@ -308,6 +365,7 @@ const SupabaseUserManagement: React.FC = () => {
                 value={newUser.username}
                 onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
                 placeholder="Enter username"
+                disabled={submitting}
               />
             </div>
             <div>
@@ -317,6 +375,7 @@ const SupabaseUserManagement: React.FC = () => {
                 value={newUser.full_name}
                 onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })}
                 placeholder="Enter full name"
+                disabled={submitting}
               />
             </div>
             <div>
@@ -327,6 +386,7 @@ const SupabaseUserManagement: React.FC = () => {
                 value={newUser.email}
                 onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
                 placeholder="Enter email"
+                disabled={submitting}
               />
             </div>
             <div>
@@ -337,11 +397,16 @@ const SupabaseUserManagement: React.FC = () => {
                 value={newUser.password}
                 onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
                 placeholder="Set password"
+                disabled={submitting}
               />
             </div>
             <div>
               <Label>Role</Label>
-              <Select value={newUser.role} onValueChange={(role) => setNewUser({ ...newUser, role: role as UserRole })}>
+              <Select 
+                value={newUser.role} 
+                onValueChange={(role) => setNewUser({ ...newUser, role: role as UserRole })}
+                disabled={submitting}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -355,11 +420,16 @@ const SupabaseUserManagement: React.FC = () => {
             </div>
             <div>
               <Label>Assign to Store</Label>
-              <Select value={newUser.store_id} onValueChange={(storeId) => setNewUser({ ...newUser, store_id: storeId })}>
+              <Select 
+                value={newUser.store_id} 
+                onValueChange={(storeId) => setNewUser({ ...newUser, store_id: storeId })}
+                disabled={submitting}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select store (optional)" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="">No store</SelectItem>
                   {stores.map((store) => (
                     <SelectItem key={store.id} value={store.id}>
                       {store.name}
@@ -369,45 +439,52 @@ const SupabaseUserManagement: React.FC = () => {
               </Select>
             </div>
           </div>
-          <Button onClick={addUser}>Add User</Button>
+          <Button onClick={addUser} disabled={submitting || !newUser.username.trim() || !newUser.full_name.trim() || !newUser.email.trim() || !newUser.password.trim()}>
+            {submitting ? 'Adding...' : 'Add User'}
+          </Button>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Current Users</CardTitle>
+          <CardTitle>Current Users ({users.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {users.map((user) => (
-              <div key={user.id} className="flex items-center justify-between p-3 border rounded-lg">
-                <div>
-                  <div className="font-medium">{user.full_name}</div>
-                  <div className="text-sm text-gray-500">
-                    {user.username} • {user.role} • {user.user_stores?.[0]?.stores?.name || 'No store assigned'}
+          {users.length === 0 ? (
+            <p className="text-gray-500 text-center py-4">No users found.</p>
+          ) : (
+            <div className="space-y-3">
+              {users.map((user) => (
+                <div key={user.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div>
+                    <div className="font-medium">{user.full_name}</div>
+                    <div className="text-sm text-gray-500">
+                      {user.username} • {user.role} • {user.user_stores?.[0]?.stores?.name || 'No store assigned'}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={user.user_stores?.[0]?.stores?.id || ''}
+                      onValueChange={(storeId) => updateUserStore(user.id, storeId)}
+                      disabled={submitting}
+                    >
+                      <SelectTrigger className="w-48">
+                        <SelectValue placeholder="Assign store" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">No store</SelectItem>
+                        {stores.map((store) => (
+                          <SelectItem key={store.id} value={store.id}>
+                            {store.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Select
-                    value={user.user_stores?.[0]?.stores?.id || ''}
-                    onValueChange={(storeId) => updateUserStore(user.id, storeId)}
-                  >
-                    <SelectTrigger className="w-48">
-                      <SelectValue placeholder="Assign store" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">No store</SelectItem>
-                      {stores.map((store) => (
-                        <SelectItem key={store.id} value={store.id}>
-                          {store.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

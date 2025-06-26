@@ -55,32 +55,27 @@ const Index = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle>Status Management</CardTitle>
+              <CardTitle>Role-Based Access</CardTitle>
               <CardDescription>
-                Categorize interactions as Closed, Quoted, or Lost with detailed reasons
+                Secure authentication with role-based permissions for different user types
               </CardDescription>
             </CardHeader>
             <CardContent>
               <ul className="space-y-2 text-sm text-gray-600">
-                <li>• Clear status categories</li>
-                <li>• Loss reason tracking</li>
-                <li>• Monetary value recording</li>
+                <li>• Salesperson access</li>
+                <li>• Manager oversight</li>
+                <li>• Admin control</li>
               </ul>
             </CardContent>
           </Card>
         </div>
 
         <div className="text-center space-y-4">
-          <div className="space-x-4">
-            <Button size="lg" onClick={() => navigate('/supabase-login')}>
-              Login to CRM (Supabase)
-            </Button>
-            <Button size="lg" variant="outline" onClick={() => navigate('/login')}>
-              Login (LocalStorage)
-            </Button>
-          </div>
+          <Button size="lg" onClick={() => navigate('/supabase-login')}>
+            Login to Sales CRM
+          </Button>
           <p className="text-sm text-gray-500">
-            Choose between Supabase-powered backend or local storage demo.
+            Secure authentication powered by Supabase
           </p>
         </div>
       </div>

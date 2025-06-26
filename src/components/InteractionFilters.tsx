@@ -39,14 +39,27 @@ const InteractionFilters: React.FC<InteractionFiltersProps> = ({ onFiltersChange
   const [stores, setStores] = useState<Store[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [loading, setLoading] = useState(false);
   const { profile } = useAuth();
 
   useEffect(() => {
     if (profile && (profile.role === 'ADMIN' || profile.role === 'BOARD' || profile.role === 'MANAGER')) {
-      loadStores();
-      loadUsers();
+      loadData();
     }
   }, [profile]);
+
+  const loadData = async () => {
+    if (!profile) return;
+    
+    setLoading(true);
+    try {
+      await Promise.all([loadStores(), loadUsers()]);
+    } catch (error) {
+      console.error('Error loading filter data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadStores = async () => {
     if (!profile) return;
@@ -54,13 +67,18 @@ const InteractionFilters: React.FC<InteractionFiltersProps> = ({ onFiltersChange
     try {
       const { data, error } = await supabase
         .from('stores')
-        .select('id, name');
+        .select('id, name')
+        .order('name');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading stores:', error);
+        return;
+      }
       
       setStores(data || []);
     } catch (error) {
       console.error('Error loading stores:', error);
+      setStores([]);
     }
   };
 
@@ -71,13 +89,18 @@ const InteractionFilters: React.FC<InteractionFiltersProps> = ({ onFiltersChange
       const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name, username')
-        .eq('role', 'SALESPERSON');
+        .eq('role', 'SALESPERSON')
+        .order('full_name');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading users:', error);
+        return;
+      }
       
       setUsers(data || []);
     } catch (error) {
       console.error('Error loading users:', error);
+      setUsers([]);
     }
   };
 
@@ -95,6 +118,10 @@ const InteractionFilters: React.FC<InteractionFiltersProps> = ({ onFiltersChange
   const canViewStoreFilter = profile?.role === 'ADMIN' || profile?.role === 'BOARD' || profile?.role === 'MANAGER';
   const canViewUserFilter = profile?.role === 'ADMIN' || profile?.role === 'BOARD' || profile?.role === 'MANAGER';
 
+  if (!profile) {
+    return null;
+  }
+
   return (
     <Card className="mb-6">
       <CardHeader>
@@ -108,6 +135,7 @@ const InteractionFilters: React.FC<InteractionFiltersProps> = ({ onFiltersChange
               variant="outline"
               size="sm"
               onClick={() => setShowFilters(!showFilters)}
+              disabled={loading}
             >
               {showFilters ? 'Hide' : 'Show'} Filters
             </Button>
@@ -125,114 +153,118 @@ const InteractionFilters: React.FC<InteractionFiltersProps> = ({ onFiltersChange
       
       {showFilters && (
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Status Filter */}
-            <div className="space-y-2">
-              <Label htmlFor="status-filter">Status</Label>
-              <Select
-                value={filters.status || ""}
-                onValueChange={(value) => handleFilterChange('status', value)}
-              >
-                <SelectTrigger id="status-filter">
-                  <SelectValue placeholder="All statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All statuses</SelectItem>
-                  <SelectItem value="Closed">Closed</SelectItem>
-                  <SelectItem value="Quoted">Quoted</SelectItem>
-                  <SelectItem value="Lost">Lost</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Date Range Filters */}
-            <div className="space-y-2">
-              <Label htmlFor="start-date">Start Date</Label>
-              <Input
-                id="start-date"
-                type="date"
-                value={filters.startDate || ''}
-                onChange={(e) => handleFilterChange('startDate', e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="end-date">End Date</Label>
-              <Input
-                id="end-date"
-                type="date"
-                value={filters.endDate || ''}
-                onChange={(e) => handleFilterChange('endDate', e.target.value)}
-              />
-            </div>
-
-            {/* Store Filter - Only for ADMIN, BOARD, MANAGER */}
-            {canViewStoreFilter && (
+          {loading ? (
+            <div className="text-center py-4">Loading filter options...</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Status Filter */}
               <div className="space-y-2">
-                <Label htmlFor="store-filter">Store</Label>
+                <Label htmlFor="status-filter">Status</Label>
                 <Select
-                  value={filters.storeId || ""}
-                  onValueChange={(value) => handleFilterChange('storeId', value)}
+                  value={filters.status || ""}
+                  onValueChange={(value) => handleFilterChange('status', value)}
                 >
-                  <SelectTrigger id="store-filter">
-                    <SelectValue placeholder="All stores" />
+                  <SelectTrigger id="status-filter">
+                    <SelectValue placeholder="All statuses" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All stores</SelectItem>
-                    {stores.map((store) => (
-                      <SelectItem key={store.id} value={store.id}>
-                        {store.name}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="">All statuses</SelectItem>
+                    <SelectItem value="Closed">Closed</SelectItem>
+                    <SelectItem value="Quoted">Quoted</SelectItem>
+                    <SelectItem value="Lost">Lost</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-            )}
 
-            {/* User Filter - Only for ADMIN, BOARD, MANAGER */}
-            {canViewUserFilter && (
+              {/* Date Range Filters */}
               <div className="space-y-2">
-                <Label htmlFor="user-filter">Salesperson</Label>
+                <Label htmlFor="start-date">Start Date</Label>
+                <Input
+                  id="start-date"
+                  type="date"
+                  value={filters.startDate || ''}
+                  onChange={(e) => handleFilterChange('startDate', e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="end-date">End Date</Label>
+                <Input
+                  id="end-date"
+                  type="date"
+                  value={filters.endDate || ''}
+                  onChange={(e) => handleFilterChange('endDate', e.target.value)}
+                />
+              </div>
+
+              {/* Store Filter - Only for ADMIN, BOARD, MANAGER */}
+              {canViewStoreFilter && (
+                <div className="space-y-2">
+                  <Label htmlFor="store-filter">Store</Label>
+                  <Select
+                    value={filters.storeId || ""}
+                    onValueChange={(value) => handleFilterChange('storeId', value)}
+                  >
+                    <SelectTrigger id="store-filter">
+                      <SelectValue placeholder="All stores" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">All stores</SelectItem>
+                      {stores.map((store) => (
+                        <SelectItem key={store.id} value={store.id}>
+                          {store.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* User Filter - Only for ADMIN, BOARD, MANAGER */}
+              {canViewUserFilter && (
+                <div className="space-y-2">
+                  <Label htmlFor="user-filter">Salesperson</Label>
+                  <Select
+                    value={filters.userId || ""}
+                    onValueChange={(value) => handleFilterChange('userId', value)}
+                  >
+                    <SelectTrigger id="user-filter">
+                      <SelectValue placeholder="All salespeople" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">All salespeople</SelectItem>
+                      {users.map((user) => (
+                        <SelectItem key={user.id} value={user.id}>
+                          {user.full_name} ({user.username})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Reason Filter */}
+              <div className="space-y-2">
+                <Label htmlFor="reason-filter">Loss Reason</Label>
                 <Select
-                  value={filters.userId || ""}
-                  onValueChange={(value) => handleFilterChange('userId', value)}
+                  value={filters.reason || ""}
+                  onValueChange={(value) => handleFilterChange('reason', value)}
                 >
-                  <SelectTrigger id="user-filter">
-                    <SelectValue placeholder="All salespeople" />
+                  <SelectTrigger id="reason-filter">
+                    <SelectValue placeholder="All reasons" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All salespeople</SelectItem>
-                    {users.map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.full_name} ({user.username})
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="">All reasons</SelectItem>
+                    <SelectItem value="Lack of product">Lack of product</SelectItem>
+                    <SelectItem value="Stock Error">Stock Error</SelectItem>
+                    <SelectItem value="Delay">Delay</SelectItem>
+                    <SelectItem value="Price">Price</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-            )}
-
-            {/* Reason Filter */}
-            <div className="space-y-2">
-              <Label htmlFor="reason-filter">Loss Reason</Label>
-              <Select
-                value={filters.reason || ""}
-                onValueChange={(value) => handleFilterChange('reason', value)}
-              >
-                <SelectTrigger id="reason-filter">
-                  <SelectValue placeholder="All reasons" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All reasons</SelectItem>
-                  <SelectItem value="Lack of product">Lack of product</SelectItem>
-                  <SelectItem value="Stock Error">Stock Error</SelectItem>
-                  <SelectItem value="Delay">Delay</SelectItem>
-                  <SelectItem value="Price">Price</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
-          </div>
+          )}
         </CardContent>
       )}
     </Card>
