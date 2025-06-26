@@ -60,6 +60,7 @@ const SupabaseDashboard = () => {
 
   const canManage = canManageUsers(profile.role);
   const canUpload = canUploadProducts(profile.role);
+  const canCreateInteractions = profile.role === 'SALESPERSON';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -109,34 +110,34 @@ const SupabaseDashboard = () => {
           <>
             <SupabaseDashboardStats />
             
-            <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2">
-                <SupabaseInteractionList />
-              </div>
+            <div className="mt-8">
+              {canCreateInteractions && (
+                <div className="mb-6">
+                  <Button onClick={() => setShowForm(true)} className="mb-4">
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Interaction
+                  </Button>
+                  
+                  {showForm && (
+                    <Card className="mb-6">
+                      <CardHeader>
+                        <CardTitle>Log New Interaction</CardTitle>
+                        <CardDescription>
+                          Record a new client interaction
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <SupabaseInteractionForm 
+                          onCancel={() => setShowForm(false)}
+                          onSuccess={() => setShowForm(false)}
+                        />
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              )}
               
-              <div className="lg:col-span-1">
-                <Button onClick={() => setShowForm(true)} className="w-full mb-4">
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Interaction
-                </Button>
-                
-                {showForm && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Log New Interaction</CardTitle>
-                      <CardDescription>
-                        Record a new client interaction
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <SupabaseInteractionForm 
-                        onCancel={() => setShowForm(false)}
-                        onSuccess={() => setShowForm(false)}
-                      />
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
+              <SupabaseInteractionList />
             </div>
           </>
         )}

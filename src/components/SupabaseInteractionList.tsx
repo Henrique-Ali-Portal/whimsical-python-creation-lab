@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import InteractionFilters from './InteractionFilters';
 
 interface Interaction {
   id: string;
@@ -14,8 +15,13 @@ interface Interaction {
   monetary_value?: number;
   created_at: string;
   user_id: string;
+  store_id?: string;
   profiles: {
     full_name: string;
+    username: string;
+  };
+  stores?: {
+    name: string;
   };
   interaction_products: {
     products: {
@@ -26,24 +32,38 @@ interface Interaction {
   }[];
 }
 
+interface FilterOptions {
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+  storeId?: string;
+  userId?: string;
+  reason?: string;
+}
+
 const SupabaseInteractionList: React.FC = () => {
   const [interactions, setInteractions] = useState<Interaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentFilters, setCurrentFilters] = useState<FilterOptions>({});
   const { profile } = useAuth();
 
   useEffect(() => {
     loadInteractions();
-  }, [profile]);
+  }, [profile, currentFilters]);
 
   const loadInteractions = async () => {
     if (!profile) return;
 
     try {
-      const { data, error } = await supabase
+      setLoading(true);
+      console.log('Loading interactions with filters:', currentFilters);
+
+      let query = supabase
         .from('interactions')
         .select(`
           *,
-          profiles!interactions_user_id_fkey(full_name),
+          profiles!interactions_user_id_fkey(full_name, username),
+          stores(name),
           interaction_products(
             products(description),
             is_custom,
@@ -52,7 +72,39 @@ const SupabaseInteractionList: React.FC = () => {
         `)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      // Apply filters
+      if (currentFilters.status) {
+        query = query.eq('status', currentFilters.status);
+      }
+
+      if (currentFilters.startDate) {
+        query = query.gte('created_at', `${currentFilters.startDate}T00:00:00.000Z`);
+      }
+
+      if (currentFilters.endDate) {
+        query = query.lte('created_at', `${currentFilters.endDate}T23:59:59.999Z`);
+      }
+
+      if (currentFilters.storeId) {
+        query = query.eq('store_id', currentFilters.storeId);
+      }
+
+      if (currentFilters.userId) {
+        query = query.eq('user_id', currentFilters.userId);
+      }
+
+      if (currentFilters.reason) {
+        query = query.eq('reason', currentFilters.reason);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error loading interactions:', error);
+        throw error;
+      }
+      
+      console.log('Loaded interactions:', data?.length || 0);
       
       // Type cast the data to ensure status matches our interface
       const typedInteractions: Interaction[] = (data || []).map(item => ({
@@ -63,9 +115,20 @@ const SupabaseInteractionList: React.FC = () => {
       setInteractions(typedInteractions);
     } catch (error) {
       console.error('Error loading interactions:', error);
+      setInteractions([]);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleFiltersChange = (filters: FilterOptions) => {
+    console.log('Filters changed:', filters);
+    setCurrentFilters(filters);
+  };
+
+  const handleClearFilters = () => {
+    console.log('Clearing filters');
+    setCurrentFilters({});
   };
 
   const getStatusColor = (status: string) => {
@@ -100,83 +163,112 @@ const SupabaseInteractionList: React.FC = () => {
 
   if (loading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Interactions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8">Loading interactions...</div>
-        </CardContent>
-      </Card>
+      <>
+        <InteractionFilters 
+          onFiltersChange={handleFiltersChange}
+          onClearFilters={handleClearFilters}
+        />
+        <Card>
+          <CardHeader>
+            <CardTitle>Interactions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8">Loading interactions...</div>
+          </CardContent>
+        </Card>
+      </>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Recent Interactions</CardTitle>
-        <CardDescription>
-          Your latest client interactions and their status
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {interactions.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">
-              No interactions logged yet. Start by adding your first client interaction!
-            </p>
-          ) : (
-            interactions.map((interaction) => (
-              <div
-                key={interaction.id}
-                className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <h3 className="font-semibold text-lg">{interaction.client_name}</h3>
-                    <p className="text-gray-600">{interaction.description}</p>
-                    <p className="text-sm text-gray-500">by {interaction.profiles.full_name}</p>
-                  </div>
-                  <Badge className={getStatusColor(interaction.status)}>
-                    {interaction.status}
-                  </Badge>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center text-sm text-gray-500">
-                    <div className="flex items-center space-x-4">
-                      {interaction.status === 'Lost' && interaction.reason && (
-                        <span className="bg-gray-100 px-2 py-1 rounded">
-                          Reason: {interaction.reason}
-                        </span>
-                      )}
-                      {interaction.monetary_value && (
-                        <span className="bg-green-100 text-green-800 px-2 py-1 rounded font-medium">
-                          {formatCurrency(interaction.monetary_value)}
-                        </span>
-                      )}
+    <>
+      <InteractionFilters 
+        onFiltersChange={handleFiltersChange}
+        onClearFilters={handleClearFilters}
+      />
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>Interactions</CardTitle>
+          <CardDescription>
+            {profile?.role === 'SALESPERSON' 
+              ? 'Your client interactions' 
+              : `All accessible interactions (${interactions.length} total)`
+            }
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {interactions.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">
+                {Object.keys(currentFilters).length > 0 
+                  ? 'No interactions match the current filters.'
+                  : profile?.role === 'SALESPERSON' 
+                    ? 'No interactions logged yet. Start by adding your first client interaction!'
+                    : 'No interactions found.'
+                }
+              </p>
+            ) : (
+              interactions.map((interaction) => (
+                <div
+                  key={interaction.id}
+                  className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <h3 className="font-semibold text-lg">{interaction.client_name}</h3>
+                      <p className="text-gray-600">{interaction.description}</p>
+                      <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+                        <span>by {interaction.profiles.full_name} ({interaction.profiles.username})</span>
+                        {interaction.stores && (
+                          <>
+                            <span>•</span>
+                            <span>{interaction.stores.name}</span>
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <span>{formatDate(interaction.created_at)}</span>
+                    <Badge className={getStatusColor(interaction.status)}>
+                      {interaction.status}
+                    </Badge>
                   </div>
                   
-                  {interaction.interaction_products && interaction.interaction_products.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      <span className="text-xs text-gray-500 mr-2">Products:</span>
-                      {interaction.interaction_products.map((ip, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
-                          {ip.is_custom ? ip.custom_description : ip.products?.description}
-                          {ip.is_custom && ' (Custom)'}
-                        </Badge>
-                      ))}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center text-sm text-gray-500">
+                      <div className="flex items-center space-x-4">
+                        {interaction.status === 'Lost' && interaction.reason && (
+                          <span className="bg-gray-100 px-2 py-1 rounded">
+                            Reason: {interaction.reason}
+                          </span>
+                        )}
+                        {interaction.monetary_value && (
+                          <span className="bg-green-100 text-green-800 px-2 py-1 rounded font-medium">
+                            {formatCurrency(interaction.monetary_value)}
+                          </span>
+                        )}
+                      </div>
+                      <span>{formatDate(interaction.created_at)}</span>
                     </div>
-                  )}
+                    
+                    {interaction.interaction_products && interaction.interaction_products.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        <span className="text-xs text-gray-500 mr-2">Products:</span>
+                        {interaction.interaction_products.map((ip, index) => (
+                          <Badge key={index} variant="outline" className="text-xs">
+                            {ip.is_custom ? ip.custom_description : ip.products?.description}
+                            {ip.is_custom && ' (Custom)'}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))
-          )}
-        </div>
-      </CardContent>
-    </Card>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </>
   );
 };
 
