@@ -39,7 +39,7 @@ const SupabaseUserManagement: React.FC = () => {
     email: '',
     password: '',
     role: 'SALESPERSON' as UserRole,
-    store_id: ''
+    store_id: 'none'
   });
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -187,7 +187,7 @@ const SupabaseUserManagement: React.FC = () => {
       }
 
       // Assign to store if selected
-      if (newUser.store_id && data.user) {
+      if (newUser.store_id && newUser.store_id !== 'none' && data.user) {
         const { error: storeError } = await supabase
           .from('user_stores')
           .insert({
@@ -206,7 +206,7 @@ const SupabaseUserManagement: React.FC = () => {
         email: '',
         password: '',
         role: 'SALESPERSON',
-        store_id: ''
+        store_id: 'none'
       });
 
       await loadUsers();
@@ -238,8 +238,8 @@ const SupabaseUserManagement: React.FC = () => {
         .delete()
         .eq('user_id', userId);
 
-      // Add new store assignment if storeId is provided
-      if (storeId) {
+      // Add new store assignment if storeId is provided and not 'none'
+      if (storeId && storeId !== 'none') {
         const { error } = await supabase
           .from('user_stores')
           .insert({
@@ -429,7 +429,7 @@ const SupabaseUserManagement: React.FC = () => {
                   <SelectValue placeholder="Select store (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No store</SelectItem>
+                  <SelectItem value="none">No store</SelectItem>
                   {stores.map((store) => (
                     <SelectItem key={store.id} value={store.id}>
                       {store.name}
@@ -464,7 +464,7 @@ const SupabaseUserManagement: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <Select
-                      value={user.user_stores?.[0]?.stores?.id || ''}
+                      value={user.user_stores?.[0]?.stores?.id || 'none'}
                       onValueChange={(storeId) => updateUserStore(user.id, storeId)}
                       disabled={submitting}
                     >
@@ -472,7 +472,7 @@ const SupabaseUserManagement: React.FC = () => {
                         <SelectValue placeholder="Assign store" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No store</SelectItem>
+                        <SelectItem value="none">No store</SelectItem>
                         {stores.map((store) => (
                           <SelectItem key={store.id} value={store.id}>
                             {store.name}
