@@ -212,6 +212,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_update_role: {
+        Args: {
+          current_user_id: string
+          target_user_id: string
+          new_role: string
+        }
+        Returns: boolean
+      }
+      can_update_store: {
+        Args: { current_user_id: string }
+        Returns: boolean
+      }
+      delete_user_cascade: {
+        Args: { target_user_id: string }
+        Returns: undefined
+      }
       get_user_role: {
         Args: { user_id: string }
         Returns: string

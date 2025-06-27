@@ -12,9 +12,22 @@ export const canUploadProducts = (userRole: UserRole): boolean => {
   return userRole === 'ADMIN' || userRole === 'BOARD';
 };
 
+export const canDeleteUsers = (userRole: UserRole): boolean => {
+  return userRole === 'ADMIN';
+};
+
 export const canChangePassword = (userRole: UserRole, targetRole: UserRole): boolean => {
   if (userRole === 'ADMIN') return true;
   if (userRole === 'BOARD') return targetRole === 'MANAGER' || targetRole === 'SALESPERSON';
+  return false;
+};
+
+export const canUpdateRole = (userRole: UserRole, currentTargetRole: UserRole, newTargetRole: UserRole): boolean => {
+  if (userRole === 'ADMIN') return true;
+  if (userRole === 'BOARD') {
+    // BOARD can only promote SALESPERSON to MANAGER
+    return currentTargetRole === 'SALESPERSON' && newTargetRole === 'MANAGER';
+  }
   return false;
 };
 
