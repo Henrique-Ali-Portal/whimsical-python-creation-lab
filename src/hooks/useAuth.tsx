@@ -19,21 +19,22 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session:', session?.user?.id);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
-
-    // Listen for auth changes
+    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state change:', event, session?.user?.id);
+        
+        if (event === 'SIGNED_OUT' || !session) {
+          // Clear all user data immediately on sign out
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+          // Clear any browser storage
+          localStorage.removeItem('supabase.auth.token');
+          sessionStorage.clear();
+          return;
+        }
+        
         setUser(session?.user ?? null);
         if (session?.user) {
           await fetchProfile(session.user.id);
@@ -43,6 +44,17 @@ export const useAuth = () => {
         }
       }
     );
+
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session:', session?.user?.id);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      } else {
+        setLoading(false);
+      }
+    });
 
     return () => subscription.unsubscribe();
   }, []);
@@ -144,8 +156,14 @@ export const useAuth = () => {
       setUser(null);
       setProfile(null);
       
+      // Clear browser storage
+      localStorage.removeItem('supabase.auth.token');
+      sessionStorage.clear();
+      
       // Then attempt to sign out from Supabase
-      const { error } = await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut({
+        scope: 'global' // Sign out from all sessions
+      });
       
       // If there's an AuthSessionMissingError, we can ignore it since the user is already signed out
       if (error && error.message !== 'Auth session missing!') {

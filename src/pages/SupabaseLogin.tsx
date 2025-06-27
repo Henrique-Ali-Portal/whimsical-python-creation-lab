@@ -16,7 +16,7 @@ const SupabaseLogin = () => {
   const [isInitializing, setIsInitializing] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { signIn, user, profile } = useAuth();
+  const { signIn, user, profile, loading } = useAuth();
 
   useEffect(() => {
     const initializeSystem = async () => {
@@ -33,12 +33,15 @@ const SupabaseLogin = () => {
     };
 
     initializeSystem();
-    
-    // Redirect if already logged in
-    if (user && profile) {
+  }, []);
+
+  useEffect(() => {
+    // Only redirect if auth is fully loaded and user is authenticated
+    if (!loading && user && profile) {
+      console.log('User authenticated, redirecting to dashboard');
       navigate('/supabase-dashboard');
     }
-  }, [user, profile, navigate]);
+  }, [user, profile, loading, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,7 +68,7 @@ const SupabaseLogin = () => {
           title: "Login Successful",
           description: "Welcome back!",
         });
-        navigate('/supabase-dashboard');
+        // Navigation will be handled by useEffect above
       }
     } catch (error: any) {
       console.error('Login error:', error);
@@ -88,6 +91,24 @@ const SupabaseLogin = () => {
             <CardDescription>
               Setting up your CRM system...
             </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show loading state if auth is still loading
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Loading...</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-center py-8">

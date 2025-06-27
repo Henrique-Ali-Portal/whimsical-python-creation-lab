@@ -22,24 +22,34 @@ const SupabaseDashboard = () => {
 
   useEffect(() => {
     if (!loading && !user) {
+      console.log('No user found, redirecting to login');
       navigate('/supabase-login');
     }
   }, [user, loading, navigate]);
 
   const handleLogout = async () => {
+    console.log('Logout button clicked');
+    
     const { error } = await signOut();
+    
     if (error) {
+      console.error('Logout failed:', error);
       toast({
         title: "Logout Error",
         description: error.message,
         variant: "destructive",
       });
     } else {
+      console.log('Logout successful, showing toast and redirecting');
       toast({
         title: "Logged Out",
         description: "You have been successfully logged out.",
       });
-      navigate('/supabase-login');
+      
+      // Small delay to show the toast before redirect
+      setTimeout(() => {
+        navigate('/supabase-login');
+      }, 500);
     }
   };
 
@@ -50,8 +60,7 @@ const SupabaseDashboard = () => {
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
           <p className="mt-4 text-gray-600">Loading...</p>
         </div>
-      </div>
-    );
+      );
   }
 
   if (!user || !profile) {
