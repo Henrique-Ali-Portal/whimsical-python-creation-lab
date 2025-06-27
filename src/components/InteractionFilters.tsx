@@ -105,7 +105,9 @@ const InteractionFilters: React.FC<InteractionFiltersProps> = ({ onFiltersChange
   };
 
   const handleFilterChange = (key: keyof FilterOptions, value: string) => {
-    const newFilters = { ...filters, [key]: value || undefined };
+    // Convert "all" back to undefined for the actual filter
+    const actualValue = value === 'all' ? undefined : value;
+    const newFilters = { ...filters, [key]: actualValue };
     setFilters(newFilters);
     onFiltersChange(newFilters);
   };
@@ -161,14 +163,14 @@ const InteractionFilters: React.FC<InteractionFiltersProps> = ({ onFiltersChange
               <div className="space-y-2">
                 <Label htmlFor="status-filter">Status</Label>
                 <Select
-                  value={filters.status || ""}
+                  value={filters.status || "all"}
                   onValueChange={(value) => handleFilterChange('status', value)}
                 >
                   <SelectTrigger id="status-filter">
                     <SelectValue placeholder="All statuses" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All statuses</SelectItem>
+                    <SelectItem value="all">All statuses</SelectItem>
                     <SelectItem value="Closed">Closed</SelectItem>
                     <SelectItem value="Quoted">Quoted</SelectItem>
                     <SelectItem value="Lost">Lost</SelectItem>
@@ -202,14 +204,14 @@ const InteractionFilters: React.FC<InteractionFiltersProps> = ({ onFiltersChange
                 <div className="space-y-2">
                   <Label htmlFor="store-filter">Store</Label>
                   <Select
-                    value={filters.storeId || ""}
+                    value={filters.storeId || "all"}
                     onValueChange={(value) => handleFilterChange('storeId', value)}
                   >
                     <SelectTrigger id="store-filter">
                       <SelectValue placeholder="All stores" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All stores</SelectItem>
+                      <SelectItem value="all">All stores</SelectItem>
                       {stores.map((store) => (
                         <SelectItem key={store.id} value={store.id}>
                           {store.name}
@@ -225,14 +227,14 @@ const InteractionFilters: React.FC<InteractionFiltersProps> = ({ onFiltersChange
                 <div className="space-y-2">
                   <Label htmlFor="user-filter">Salesperson</Label>
                   <Select
-                    value={filters.userId || ""}
+                    value={filters.userId || "all"}
                     onValueChange={(value) => handleFilterChange('userId', value)}
                   >
                     <SelectTrigger id="user-filter">
                       <SelectValue placeholder="All salespeople" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All salespeople</SelectItem>
+                      <SelectItem value="all">All salespeople</SelectItem>
                       {users.map((user) => (
                         <SelectItem key={user.id} value={user.id}>
                           {user.full_name} ({user.username})
@@ -247,14 +249,14 @@ const InteractionFilters: React.FC<InteractionFiltersProps> = ({ onFiltersChange
               <div className="space-y-2">
                 <Label htmlFor="reason-filter">Loss Reason</Label>
                 <Select
-                  value={filters.reason || ""}
+                  value={filters.reason || "all"}
                   onValueChange={(value) => handleFilterChange('reason', value)}
                 >
                   <SelectTrigger id="reason-filter">
                     <SelectValue placeholder="All reasons" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All reasons</SelectItem>
+                    <SelectItem value="all">All reasons</SelectItem>
                     <SelectItem value="Lack of product">Lack of product</SelectItem>
                     <SelectItem value="Stock Error">Stock Error</SelectItem>
                     <SelectItem value="Delay">Delay</SelectItem>
