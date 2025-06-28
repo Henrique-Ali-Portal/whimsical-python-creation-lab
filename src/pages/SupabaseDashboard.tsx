@@ -53,6 +53,12 @@ const SupabaseDashboard = () => {
     }
   };
 
+  const handleInteractionSuccess = () => {
+    console.log('Interaction created successfully, closing form');
+    setShowForm(false);
+    // The real-time subscription in SupabaseInteractionList will handle the refresh
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -139,7 +145,7 @@ const SupabaseDashboard = () => {
                       <CardContent>
                         <SupabaseInteractionForm 
                           onCancel={() => setShowForm(false)}
-                          onSuccess={() => setShowForm(false)}
+                          onSuccess={handleInteractionSuccess}
                         />
                       </CardContent>
                     </Card>

@@ -51,6 +51,35 @@ const SupabaseInteractionList: React.FC = () => {
     loadInteractions();
   }, [profile, currentFilters]);
 
+  // Set up real-time subscription for interactions
+  useEffect(() => {
+    if (!profile) return;
+
+    console.log('Setting up real-time subscription for interactions');
+    
+    const channel = supabase
+      .channel('interactions-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'interactions'
+        },
+        (payload) => {
+          console.log('Real-time interaction change:', payload);
+          // Reload interactions when any change occurs
+          loadInteractions();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('Cleaning up real-time subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [profile]);
+
   const loadInteractions = async () => {
     if (!profile) return;
 
@@ -193,6 +222,8 @@ const SupabaseInteractionList: React.FC = () => {
           <CardDescription>
             {profile?.role === 'SALESPERSON' 
               ? 'Your client interactions' 
+              : profile?.role === 'MANAGER'
+              ? `Store interactions (${interactions.length} total)`
               : `All accessible interactions (${interactions.length} total)`
             }
           </CardDescription>

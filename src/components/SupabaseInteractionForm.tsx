@@ -33,11 +33,13 @@ const SupabaseInteractionForm: React.FC<SupabaseInteractionFormProps> = ({ onCan
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [userStoreId, setUserStoreId] = useState<string | null>(null);
   const { toast } = useToast();
   const { profile } = useAuth();
 
   useEffect(() => {
     loadProducts();
+    loadUserStore();
   }, []);
 
   const loadProducts = async () => {
@@ -54,6 +56,31 @@ const SupabaseInteractionForm: React.FC<SupabaseInteractionFormProps> = ({ onCan
     }
   };
 
+  const loadUserStore = async () => {
+    if (!profile) return;
+
+    try {
+      console.log('Loading user store for profile:', profile.id);
+      
+      const { data, error } = await supabase
+        .from('user_stores')
+        .select('store_id')
+        .eq('user_id', profile.id)
+        .single();
+
+      if (error) {
+        console.error('Error loading user store:', error);
+        // If no store is assigned, we'll still allow interaction creation
+        return;
+      }
+
+      console.log('User store loaded:', data?.store_id);
+      setUserStoreId(data?.store_id || null);
+    } catch (error) {
+      console.error('Error loading user store:', error);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
@@ -61,7 +88,9 @@ const SupabaseInteractionForm: React.FC<SupabaseInteractionFormProps> = ({ onCan
     setIsSubmitting(true);
 
     try {
-      // Insert interaction
+      console.log('Creating interaction with store_id:', userStoreId);
+      
+      // Insert interaction with store_id
       const { data: interaction, error: interactionError } = await supabase
         .from('interactions')
         .insert({
@@ -71,11 +100,17 @@ const SupabaseInteractionForm: React.FC<SupabaseInteractionFormProps> = ({ onCan
           reason: formData.status === 'Lost' ? formData.reason : null,
           monetary_value: formData.monetaryValue ? parseFloat(formData.monetaryValue) : null,
           user_id: profile.id,
+          store_id: userStoreId, // Capture current store association
         })
         .select()
         .single();
 
-      if (interactionError) throw interactionError;
+      if (interactionError) {
+        console.error('Error creating interaction:', interactionError);
+        throw interactionError;
+      }
+
+      console.log('Interaction created successfully:', interaction.id);
 
       // Insert selected products
       if (selectedProducts.length > 0) {
@@ -89,7 +124,10 @@ const SupabaseInteractionForm: React.FC<SupabaseInteractionFormProps> = ({ onCan
           .from('interaction_products')
           .insert(productInserts);
 
-        if (productsError) throw productsError;
+        if (productsError) {
+          console.error('Error adding products to interaction:', productsError);
+          throw productsError;
+        }
       }
 
       toast({
@@ -98,11 +136,11 @@ const SupabaseInteractionForm: React.FC<SupabaseInteractionFormProps> = ({ onCan
       });
 
       onSuccess();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding interaction:', error);
       toast({
         title: "Error",
-        description: "Failed to add interaction. Please try again.",
+        description: error.message || "Failed to add interaction. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -220,6 +258,12 @@ const SupabaseInteractionForm: React.FC<SupabaseInteractionFormProps> = ({ onCan
           </div>
         )}
       </div>
+
+      {userStoreId && (
+        <div className="text-sm text-gray-600 bg-blue-50 p-2 rounded">
+          This interaction will be associated with your current store.
+        </div>
+      )}
 
       <div className="flex space-x-2">
         <Button type="submit" disabled={isSubmitting}>
