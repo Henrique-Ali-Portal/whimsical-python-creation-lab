@@ -1,21 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-
-interface Product {
-  id: string;
-  product_code: string;
-  description: string;
-  cost_price: number;
-  sale_price: number;
-}
+import { useInteractionForm } from '@/hooks/useInteractionForm';
+import ProductSelector from './ProductSelector';
 
 interface SupabaseInteractionFormProps {
   onCancel: () => void;
@@ -23,134 +14,16 @@ interface SupabaseInteractionFormProps {
 }
 
 const SupabaseInteractionForm: React.FC<SupabaseInteractionFormProps> = ({ onCancel, onSuccess }) => {
-  const [formData, setFormData] = useState({
-    clientName: '',
-    description: '',
-    status: 'Quoted' as 'Closed' | 'Quoted' | 'Lost',
-    reason: '' as 'Lack of product' | 'Stock Error' | 'Delay' | 'Price' | 'Other' | '',
-    monetaryValue: '',
-  });
-  const [products, setProducts] = useState<Product[]>([]);
-  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [userStoreId, setUserStoreId] = useState<string | null>(null);
-  const { toast } = useToast();
-  const { profile } = useAuth();
-
-  useEffect(() => {
-    loadProducts();
-    loadUserStore();
-  }, []);
-
-  const loadProducts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('description');
-
-      if (error) throw error;
-      setProducts(data || []);
-    } catch (error) {
-      console.error('Error loading products:', error);
-    }
-  };
-
-  const loadUserStore = async () => {
-    if (!profile) return;
-
-    try {
-      console.log('Loading user store for profile:', profile.id);
-      
-      const { data, error } = await supabase
-        .from('user_stores')
-        .select('store_id')
-        .eq('user_id', profile.id)
-        .single();
-
-      if (error) {
-        console.error('Error loading user store:', error);
-        // If no store is assigned, we'll still allow interaction creation
-        return;
-      }
-
-      console.log('User store loaded:', data?.store_id);
-      setUserStoreId(data?.store_id || null);
-    } catch (error) {
-      console.error('Error loading user store:', error);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!profile) return;
-
-    setIsSubmitting(true);
-
-    try {
-      console.log('Creating interaction with store_id:', userStoreId);
-      
-      // Insert interaction with store_id
-      const { data: interaction, error: interactionError } = await supabase
-        .from('interactions')
-        .insert({
-          client_name: formData.clientName,
-          description: formData.description,
-          status: formData.status,
-          reason: formData.status === 'Lost' ? formData.reason : null,
-          monetary_value: formData.monetaryValue ? parseFloat(formData.monetaryValue) : null,
-          user_id: profile.id,
-          store_id: userStoreId, // Capture current store association
-        })
-        .select()
-        .single();
-
-      if (interactionError) {
-        console.error('Error creating interaction:', interactionError);
-        throw interactionError;
-      }
-
-      console.log('Interaction created successfully:', interaction.id);
-
-      // Insert selected products
-      if (selectedProducts.length > 0) {
-        const productInserts = selectedProducts.map(productId => ({
-          interaction_id: interaction.id,
-          product_id: productId,
-          is_custom: false,
-        }));
-
-        const { error: productsError } = await supabase
-          .from('interaction_products')
-          .insert(productInserts);
-
-        if (productsError) {
-          console.error('Error adding products to interaction:', productsError);
-          throw productsError;
-        }
-      }
-
-      toast({
-        title: "Interaction Added",
-        description: "Client interaction has been logged successfully.",
-      });
-
-      onSuccess();
-    } catch (error: any) {
-      console.error('Error adding interaction:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to add interaction. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
+  const {
+    formData,
+    products,
+    selectedProducts,
+    setSelectedProducts,
+    isSubmitting,
+    userStoreId,
+    handleSubmit,
+    handleInputChange,
+  } = useInteractionForm(onSuccess);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -218,46 +91,11 @@ const SupabaseInteractionForm: React.FC<SupabaseInteractionFormProps> = ({ onCan
         />
       </div>
 
-      <div>
-        <Label>Related Products</Label>
-        <Select value="" onValueChange={(productId) => {
-          if (!selectedProducts.includes(productId)) {
-            setSelectedProducts([...selectedProducts, productId]);
-          }
-        }}>
-          <SelectTrigger>
-            <SelectValue placeholder="Add products" />
-          </SelectTrigger>
-          <SelectContent>
-            {products.map((product) => (
-              <SelectItem key={product.id} value={product.id}>
-                {product.description}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        
-        {selectedProducts.length > 0 && (
-          <div className="mt-2 space-y-1">
-            {selectedProducts.map((productId) => {
-              const product = products.find(p => p.id === productId);
-              return (
-                <div key={productId} className="flex items-center justify-between bg-gray-100 p-2 rounded">
-                  <span className="text-sm">{product?.description}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedProducts(selectedProducts.filter(id => id !== productId))}
-                  >
-                    Remove
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      <ProductSelector
+        products={products}
+        selectedProducts={selectedProducts}
+        onProductsChange={setSelectedProducts}
+      />
 
       {userStoreId && (
         <div className="text-sm text-gray-600 bg-blue-50 p-2 rounded">
