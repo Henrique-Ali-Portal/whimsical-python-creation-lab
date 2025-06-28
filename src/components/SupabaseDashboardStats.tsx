@@ -24,23 +24,58 @@ const SupabaseDashboardStats: React.FC = () => {
   const { profile } = useAuth();
 
   useEffect(() => {
-    loadStats();
+    if (profile) {
+      loadStats();
+    }
   }, [profile]);
 
   const loadStats = async () => {
     if (!profile) return;
 
     try {
-      // Get all interactions for the current user (or all if admin/board)
-      let query = supabase.from('interactions').select('*');
-      
-      if (profile.role !== 'ADMIN' && profile.role !== 'BOARD') {
+      console.log('Loading stats for user role:', profile.role);
+
+      let query = supabase
+        .from('interactions')
+        .select('*');
+
+      // Apply role-based filtering
+      if (profile.role === 'SALESPERSON') {
+        // Salesperson can only see their own interactions
         query = query.eq('user_id', profile.id);
+        console.log('Filtering stats for SALESPERSON:', profile.id);
+      } else if (profile.role === 'MANAGER') {
+        // Manager can see interactions from their store
+        const { data: userStore } = await supabase
+          .from('user_stores')
+          .select('store_id')
+          .eq('user_id', profile.id)
+          .single();
+        
+        if (userStore?.store_id) {
+          query = query.eq('store_id', userStore.store_id);
+          console.log('Filtering stats for MANAGER store:', userStore.store_id);
+        } else {
+          // If manager has no store, show no stats
+          console.log('Manager has no store, showing empty stats');
+          setStats({
+            totalInteractions: 0,
+            closedDeals: 0,
+            totalRevenue: 0,
+            averageDealValue: 0,
+            closingRate: 0,
+          });
+          setLoading(false);
+          return;
+        }
       }
+      // ADMIN and BOARD can see all interactions (no additional filter)
 
       const { data: interactions, error } = await query;
 
       if (error) throw error;
+
+      console.log('Loaded interactions for stats:', interactions?.length || 0);
 
       const totalInteractions = interactions?.length || 0;
       const closedDeals = interactions?.filter(i => i.status === 'Closed').length || 0;
@@ -60,6 +95,14 @@ const SupabaseDashboardStats: React.FC = () => {
       });
     } catch (error) {
       console.error('Error loading stats:', error);
+      // Set empty stats on error
+      setStats({
+        totalInteractions: 0,
+        closedDeals: 0,
+        totalRevenue: 0,
+        averageDealValue: 0,
+        closingRate: 0,
+      });
     } finally {
       setLoading(false);
     }
