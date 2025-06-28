@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +15,7 @@ import { canManageUsers, canUploadProducts } from '@/utils/supabase-security';
 const SupabaseDashboard = () => {
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState<'interactions' | 'products' | 'users'>('interactions');
+  const [interactionListKey, setInteractionListKey] = useState(0);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, profile, signOut, loading } = useAuth();
@@ -54,9 +54,16 @@ const SupabaseDashboard = () => {
   };
 
   const handleInteractionSuccess = () => {
-    console.log('Interaction created successfully, closing form');
+    console.log('Interaction created successfully, closing form and refreshing list');
     setShowForm(false);
-    // The real-time subscription in SupabaseInteractionList will handle the refresh
+    
+    // Force refresh of the interaction list component
+    setInteractionListKey(prev => prev + 1);
+    
+    // Scroll to top to show the new interaction
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 100);
   };
 
   if (loading) {
@@ -153,7 +160,7 @@ const SupabaseDashboard = () => {
                 </div>
               )}
               
-              <SupabaseInteractionList />
+              <SupabaseInteractionList key={interactionListKey} />
             </div>
           </>
         )}

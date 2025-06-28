@@ -45,7 +45,9 @@ export const useInteractionsList = () => {
   const { profile } = useAuth();
 
   useEffect(() => {
-    loadInteractions();
+    if (profile) {
+      loadInteractions();
+    }
   }, [profile, currentFilters]);
 
   // Set up real-time subscription for interactions
@@ -65,6 +67,20 @@ export const useInteractionsList = () => {
         },
         (payload) => {
           console.log('Real-time interaction change:', payload);
+          // Immediately refresh the interactions list
+          loadInteractions();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'interaction_products'
+        },
+        (payload) => {
+          console.log('Real-time interaction products change:', payload);
+          // Refresh when products are added/removed from interactions
           loadInteractions();
         }
       )
@@ -97,7 +113,30 @@ export const useInteractionsList = () => {
         `)
         .order('created_at', { ascending: false });
 
-      // Apply filters
+      // Apply role-based filtering
+      if (profile.role === 'SALESPERSON') {
+        // Salesperson can only see their own interactions
+        query = query.eq('user_id', profile.id);
+      } else if (profile.role === 'MANAGER') {
+        // Manager can see interactions from their store
+        const { data: userStore } = await supabase
+          .from('user_stores')
+          .select('store_id')
+          .eq('user_id', profile.id)
+          .single();
+        
+        if (userStore?.store_id) {
+          query = query.eq('store_id', userStore.store_id);
+        } else {
+          // If manager has no store, show no interactions
+          setInteractions([]);
+          setLoading(false);
+          return;
+        }
+      }
+      // ADMIN and BOARD can see all interactions (no additional filter)
+
+      // Apply user-defined filters
       if (currentFilters.status) {
         query = query.eq('status', currentFilters.status);
       }
@@ -155,11 +194,17 @@ export const useInteractionsList = () => {
     setCurrentFilters({});
   };
 
+  const refreshInteractions = () => {
+    console.log('Manual refresh triggered');
+    loadInteractions();
+  };
+
   return {
     interactions,
     loading,
     currentFilters,
     handleFiltersChange,
     handleClearFilters,
+    refreshInteractions,
   };
 };

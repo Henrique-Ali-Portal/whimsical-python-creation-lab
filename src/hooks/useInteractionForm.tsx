@@ -38,7 +38,7 @@ export const useInteractionForm = (onSuccess: () => void) => {
   useEffect(() => {
     loadProducts();
     loadUserStore();
-  }, []);
+  }, [profile]);
 
   const loadProducts = async () => {
     try {
@@ -68,6 +68,8 @@ export const useInteractionForm = (onSuccess: () => void) => {
 
       if (error) {
         console.error('Error loading user store:', error);
+        // If no store found, set to null (interactions can exist without store)
+        setUserStoreId(null);
         return;
       }
 
@@ -75,17 +77,36 @@ export const useInteractionForm = (onSuccess: () => void) => {
       setUserStoreId(data?.store_id || null);
     } catch (error) {
       console.error('Error loading user store:', error);
+      setUserStoreId(null);
     }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      clientName: '',
+      description: '',
+      status: 'Quoted',
+      reason: '',
+      monetaryValue: '',
+    });
+    setSelectedProducts([]);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profile) return;
+    if (!profile) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to create interactions.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsSubmitting(true);
 
     try {
-      console.log('Creating interaction with store_id:', userStoreId);
+      console.log('Creating interaction with store_id:', userStoreId, 'for user:', profile.id);
       
       const { data: interaction, error: interactionError } = await supabase
         .from('interactions')
@@ -93,7 +114,7 @@ export const useInteractionForm = (onSuccess: () => void) => {
           client_name: formData.clientName,
           description: formData.description,
           status: formData.status,
-          reason: formData.status === 'Lost' ? formData.reason : null,
+          reason: formData.status === 'Lost' ? formData.reason || null : null,
           monetary_value: formData.monetaryValue ? parseFloat(formData.monetaryValue) : null,
           user_id: profile.id,
           store_id: userStoreId,
@@ -108,6 +129,7 @@ export const useInteractionForm = (onSuccess: () => void) => {
 
       console.log('Interaction created successfully:', interaction.id);
 
+      // Add selected products to the interaction
       if (selectedProducts.length > 0) {
         const productInserts = selectedProducts.map(productId => ({
           interaction_id: interaction.id,
@@ -125,17 +147,23 @@ export const useInteractionForm = (onSuccess: () => void) => {
         }
       }
 
+      // Reset form state
+      resetForm();
+
+      // Show success notification
       toast({
-        title: "Interaction Added",
-        description: "Client interaction has been logged successfully.",
+        title: "Interaction Created",
+        description: `Successfully logged interaction for ${formData.clientName}.`,
       });
 
+      // Call success callback to close form and trigger refresh
       onSuccess();
+
     } catch (error: any) {
       console.error('Error adding interaction:', error);
       toast({
-        title: "Error",
-        description: error.message || "Failed to add interaction. Please try again.",
+        title: "Error Creating Interaction",
+        description: error.message || "Failed to create interaction. Please try again.",
         variant: "destructive",
       });
     } finally {
